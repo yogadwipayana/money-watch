@@ -1,0 +1,25 @@
+---
+export const prerender = false; // 🚀 biar server-render
+
+// pastikan broker berupa string
+const { broker } = Astro.params as { broker: string };
+
+const datas: Record<string, { cash: number; invested: number }> = {
+  stockbit: { cash: 100000, invested: 500000 },
+  ajaib: { cash: 200000, invested: 150000 },
+  "indo-premier": { cash: 300000, invested: 250000 },
+};
+
+const detail = datas[broker];
+---
+<main>
+  {detail ? (
+    <>
+      <h1>Broker: {broker}</h1>
+      <p>Cash: {detail.cash}</p>
+      <p>Invested: {detail.invested}</p>
+    </>
+  ) : (
+    <h1>Broker "{broker}" tidak ditemukan 🚫</h1>
+  )}
+</main>

@@ -1,0 +1,28 @@
+---
+import Link from "./link.astro";
+
+function toSlug(name: string) {
+  return name.toLowerCase().replace(/\s+/g, "-");
+}
+const {broker, cash, invested, equity} = Astro.props;
+---
+
+<div class="bg-gray-700 w-80 h-52 m-4 rounded-xl shadow-lg flex flex-col p-5 pr-7 justify-center">
+    <div class="flex justify-between items-center">
+        <h2 class="bg-amber-40 text-2xl font-bold text-white h-fit w-full ">{broker}</h2>
+        <Link url={`/dashboard/${toSlug(broker)}`} Class="" content=""><i class="fa-solid fa-arrow-right fa-lg" style="color: #ffffff;"></i></Link>
+        <!-- <i class="fa-solid fa-arrow-right fa-lg" style="color: #ffffff;"></i> -->
+    </div>
+    <p class="bg-amber-40 text-lg text-neutral-400 mt-5">Total Equity</p>
+    <h1 class="bg-amber-40 text-3xl text-white">{equity}</h1>
+    <div class="bg-blue-40 grid grid-cols-2 mt-3">
+        <div>
+            <p class="text-neutral-400">Cash</p>
+            <h1 class="text-1xl text-white">{cash}</h1>
+        </div>
+        <div>
+            <p class="text-neutral-400">Invested</p>
+            <h1 class="text-1xl text-white">{invested}</h1>
+        </div>
+    </div>
+</div>  

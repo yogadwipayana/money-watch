@@ -1,0 +1,23 @@
+---
+import Link from "../components/link.astro";
+import Logo from "../../public/favicon.svg";
+---
+
+<div class="bg-amber-40 m-auto flex justify-center items-center">
+  <nav class="bg-fuchsia-40 flex justify-between items-center py-2 mt-1 w-full max-w-5xl">
+    <div class="flex justify-center items-center gap-15">
+      <Logo class="w-15 h-15 text-green-500" />
+      <div class="flex gap-5">
+        <Link url="/" Class="text-neutral-50 text-xl" content="Home" />
+        <Link url="/dashboard" Class="text-neutral-50 text-xl" content="Dashboard"/>
+      </div>
+    </div>
+    <div class="gap-3 flex">
+      <Link url="/login" Class="text-neutral-50 text-lg bg-green-500 px-6 py-2 rounded-lg" content="Login"/>
+      <Link url="/register" Class="text-neutral-50 text-lg bg-green-500 px-4 py-2 rounded-lg" content="Register"/>
+    </div>
+    <div class="bg-red-600 md:hidden">
+      <i class="fa-solid fa-bars fa-2xl" style="color: #ffffff;"></i>
+    </div>
+  </nav>
+</div>
