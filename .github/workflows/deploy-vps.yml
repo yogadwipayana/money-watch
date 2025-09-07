@@ -1,0 +1,33 @@
+name: Deploy to VPS via Docker
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_KEY }}
+
+    - name: Copy files to VPS
+      run: |
+        rsync -avz -e "ssh -p ${{ secrets.PORT }}" --exclude 'node_modules' --exclude '.git' ./ ${{ secrets.USER }}@${{ secrets.HOST }}:/home/${{ secrets.USER }}/money-watch
+
+    - name: Remote Docker Build and Restart
+      run: |
+        ssh -p ${{ secrets.PORT }} ${{ secrets.USER }}@${{ secrets.HOST }} << 'ENDSSH'
+          cd ~/money-watch
+          docker stop money-watch || true
+          docker rm money-watch || true
+          docker build -t money-watch .
+          docker run -d --name money-watch -p 4321:4321 money-watch
+        ENDSSH
