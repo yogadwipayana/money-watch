@@ -1,25 +1,36 @@
 ---
-export const prerender = false; // 🚀 biar server-render
+import List from "../../components/broker/list.astro";
+import ListGroups from "../../layouts/broker/listGroups.astro";
+import Layout from "../../layouts/layout.astro";
+import Navbar from "../../layouts/navbar.astro";
 
-// pastikan broker berupa string
+export const prerender = false;
 const { broker } = Astro.params as { broker: string };
 
-const datas: Record<string, { cash: number; invested: number }> = {
-  stockbit: { cash: 100000, invested: 500000 },
-  ajaib: { cash: 200000, invested: 150000 },
-  "indo-premier": { cash: 300000, invested: 250000 },
-};
+const datas = [{
+  message: "Succes",
+  broker: "ajaib",
+  cash: 1000000,
+  data: [
+    {kode: "BBCA", lot: 10, avgPrice: 1000, lastPrice: 1100},
+    {kode: "BMRI", lot: 5, avgPrice: 2000, lastPrice: 2100},
+    {kode: "BRRI", lot: 15, avgPrice: 1500, lastPrice: 1600}
+  ]
+}]
 
-const detail = datas[broker];
+const detail = datas.find((item) => item.broker === broker);
 ---
-<main>
+<Layout title={`Dashboard - ${broker}`}>
   {detail ? (
     <>
-      <h1>Broker: {broker}</h1>
-      <p>Cash: {detail.cash}</p>
-      <p>Invested: {detail.invested}</p>
+      {/* <Navbar /> */}
+      <ListGroups>
+        {detail.data.map((item) => (
+          <List />
+        ))}
+      </ListGroups>
     </>
   ) : (
     <h1>Broker "{broker}" tidak ditemukan 🚫</h1>
   )}
-</main>
+</Layout>

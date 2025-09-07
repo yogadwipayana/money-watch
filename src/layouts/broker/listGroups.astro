@@ -1,0 +1,42 @@
+---
+import List from "../../components/broker/list.astro";
+---
+
+<main class="grid grid-rows-2 bg-amber-95 w-full justify-center items-center">
+    <div class="bg-amber-60 max-w-5xl h-auto flex flex-col justify-center items-center ">
+        <span class="bg-amber-60 max-w-2xl h-auto grid grid-cols-1 md:grid-cols-2 my-5 gap-5  ">
+            <div class="bg-gray-700 text-neutral-300 max-w-80 grid grid-cols-2 place-content-center p-2 gap-5 rounded-lg">
+                <span>
+                    <p>Portofolio</p>
+                    <h1 class="text-2xl text-neutral-100 mb-2">Rp 3.000.000</h1>
+                    <p>Return Today</p>
+                </span>
+                <span class="bg-red-60 flex flex-col justify-end text-start">
+                    <p>Rp100.000(0,00%)</p>
+                </span>
+            </div>
+            <div class="bg-gray-700 text-neutral-300 grid grid-cols-2 p-2 place-content-center rounded-lg">
+                <span>
+                    <p>Cash</p>
+                    <h1 class="text-md text-neutral-100">Rp1.000.000</h1>
+
+                    <p class="mt-2">P&L</p>
+                    <h1 class="text-md text-neutral-100">Rp10.000</h1>
+                </span>
+                <span>
+                    <p>Invested</p>
+                    <h1 class="text-md text-neutral-100">Rp1.000.000</h1>
+
+                    <p class="mt-2">Profit</p>
+                    <h1 class="text-md text-neutral-100">10,00%</h1>
+                </span>
+            </div>
+        </span>
+        <slot/>
+        <!-- <div class="grid place-content-center">
+            <List />
+            <List />
+            <List />
+        </div> -->
+    </div>
+</main>
