@@ -1,5 +1,4 @@
 ---
-import { postHolding } from "../../utils/postHolding.js";
 
 const rupiah = (value: number) => {
   return new Intl.NumberFormat("id-ID", {
@@ -35,56 +34,6 @@ const profit = (pnl / (totalPortofolio - pnl)) * 100;
 const invested = totalPortofolio - datas.cash;
 const profitDisplay = profit.toFixed(2) + "%";
 
-if (Astro.request.method === "POST") {
-  const formData = await Astro.request.formData();
-  const transaction = formData.get("transaction");
-
-  if (transaction === 'buy') {
-    const stockCode = (formData.get("code") ?? "").toString().toUpperCase();
-    const price = Number(formData.get("price") ?? 0);
-    const quantity = Number(formData.get("lot") ?? 0);
-
-    const payload = {
-      brokerName: broker,
-      stockCode,
-      quantity,
-      price
-    };
-
-    const success = await postHolding(payload, 'buy', Astro.cookies, Astro.request);
-    if (success) {
-      return Astro.redirect(`/dashboard/${broker}`, 303);
-    }
-  } else if (transaction === 'sell') {
-    const stockCode = (formData.get("code") ?? "").toString().toUpperCase();
-    const price = Number(formData.get("price") ?? 0);
-    const quantity = Number(formData.get("lot") ?? 0);
-
-    const payload = {
-      brokerName: broker,
-      stockCode,
-      quantity,
-      price
-    };
-
-    const success = await postHolding(payload, 'sell', Astro.cookies, Astro.request);
-    if (success) {
-      return Astro.redirect(`/dashboard/${broker}`, 303);
-    }
-  } else if (transaction === 'deposit') {
-    const cashBalance = formData.get("cash");
-    const payload = { brokerName: broker, cashBalance };
-    
-    const success = await postHolding(payload, 'deposit', Astro.cookies, Astro.request);
-  } else if (transaction === 'withdraw') {
-    const cashBalance = formData.get("cash");
-    const payload = { brokerName: broker, cashBalance };
-    
-    const success = await postHolding(payload, 'withdraw', Astro.cookies, Astro.request);
-  } else {
-    console.log("No valid transaction type selected.");
-  }
-}
 ---
 
 <main class="bg-blue-60 flex flex-col w-full h-[calc(90vh-4rem)] place-items-center">

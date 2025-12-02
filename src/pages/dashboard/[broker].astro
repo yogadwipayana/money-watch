@@ -4,6 +4,7 @@ import ListGroups from "../../layouts/broker/listGroups.astro";
 import Layout from "../../layouts/layout.astro";
 import Navbar from "../../layouts/navbar.astro";
 import { isAuthenticated, getAuthToken } from "../../utils/auth.js";
+import { postHolding } from "../../utils/postHolding.js";
 
 export const prerender = false;
 
@@ -74,6 +75,11 @@ async function getDataHolding() {
 
 let dataFetched = await getDataHolding();
 
+// Redirect jika fetch gagal atau broker tidak ditemukan
+if (!dataFetched) {
+  return Astro.redirect('/dashboard', 303);
+}
+
 if (Astro.request.method === "DELETE") {
   const brokerName = broker;
   const data = { brokerName };
@@ -107,9 +113,61 @@ if (Astro.request.method === "DELETE") {
   }  
 }
 
-// Redirect jika fetch gagal atau broker tidak ditemukan
-if (!dataFetched) {
-  return Astro.redirect('/dashboard', 303);
+if (Astro.request.method === "POST") {
+  const formData = await Astro.request.formData();
+  const transaction = formData.get("transaction");
+
+  if (transaction === 'buy') {
+    const stockCode = (formData.get("code") ?? "").toString().toUpperCase();
+    const price = Number(formData.get("price") ?? 0);
+    const quantity = Number(formData.get("lot") ?? 0);
+
+    const payload = {
+      brokerName: broker,
+      stockCode,
+      quantity,
+      price
+    };
+
+    const success = await postHolding(payload, 'buy', Astro.cookies, Astro.request);
+    if (success) {
+      return Astro.redirect(`/dashboard/${broker}`, 303);
+    }
+  } else if (transaction === 'sell') {
+    const stockCode = (formData.get("code") ?? "").toString().toUpperCase();
+    const price = Number(formData.get("price") ?? 0);
+    const quantity = Number(formData.get("lot") ?? 0);
+
+    const payload = {
+      brokerName: broker,
+      stockCode,
+      quantity,
+      price
+    };
+
+    const success = await postHolding(payload, 'sell', Astro.cookies, Astro.request);
+    if (success) {
+      return Astro.redirect(`/dashboard/${broker}`, 303);
+    }
+  } else if (transaction === 'deposit') {
+    const cashBalance = formData.get("cash");
+    const payload = { brokerName: broker, cashBalance };
+    
+    const success = await postHolding(payload, 'deposit', Astro.cookies, Astro.request);
+    if (success) {
+      return Astro.redirect(`/dashboard/${broker}`, 303);
+    }
+  } else if (transaction === 'withdraw') {
+    const cashBalance = formData.get("cash");
+    const payload = { brokerName: broker, cashBalance };
+    
+    const success = await postHolding(payload, 'withdraw', Astro.cookies, Astro.request);
+    if (success) {
+      return Astro.redirect(`/dashboard/${broker}`, 303);
+    }
+  } else {
+    console.log("No valid transaction type selected.");
+  }
 }
 
 const detail: any = datas.length > 0

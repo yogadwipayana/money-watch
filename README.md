@@ -38,7 +38,7 @@ Before you begin, ensure you have the following installed:
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd "Money Watch/frontend"
+   cd "money-watch"
    ```
 
 2. **Install dependencies**
@@ -77,20 +77,7 @@ Before you begin, ensure you have the following installed:
    docker run -p 4321:4321 -e API_URL=http://your-api-url money-watch
    ```
 
-   Or using docker-compose (create a `docker-compose.yml` file):
-   ```yaml
-   version: '3.8'
-   services:
-     frontend:
-       build: .
-       ports:
-         - "4321:4321"
-       environment:
-         - API_URL=http://your-api-url
-       restart: unless-stopped
-   ```
-
-   Then run:
+   Or run:
    ```bash
    docker-compose up -d
    ```
