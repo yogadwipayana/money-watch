@@ -2,9 +2,10 @@
 import Link from "./link.astro";
 
 function toSlug(name: string) {
-  return name.toLowerCase().replace(/\s+/g, "-");
+  return name.toLowerCase();
 }
 const {broker, cash, invested, equity} = Astro.props;
+
 ---
 
 <div class="bg-gray-700 w-80 h-52 m-4 rounded-xl shadow-lg flex flex-col p-5 pr-7 justify-center">

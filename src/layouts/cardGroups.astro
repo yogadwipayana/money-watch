@@ -1,5 +1,6 @@
 ---
 import Card from "../components/card.astro";
+import { getAuthToken } from "../utils/auth.js";
 
 const rupiah = (value: number) => {
   return new Intl.NumberFormat("id-ID", {
@@ -10,30 +11,49 @@ const rupiah = (value: number) => {
   }).format(value);
 };
 
-let datas = [
-    {
-        broker: "Stockbit",
-        cash: 1000000,
-        invested: 500000,
-    },
-    {
-        broker: "Ajaib",
-        cash: 2000000,
-        invested: 1500000,
-    },
-    {
-        broker: "Indo Premier",
-        cash: 3000000,
-        invested: 2500000,
-    }
-    ];
+let errorMessage = '';
+
 ---
 
-<main class="flex justify-center items-center">
-  <div id="groups" class="bg-gray-80 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 h-auto max-w-6xl">
-    {datas.map((data, i) => (
-        // let equity = data.cash + data.invested;
-      <Card broker={data.broker} cash={rupiah(data.cash)} invested={rupiah(data.invested)} equity={rupiah(data.cash + data.invested)}/>
-    ))}
+<main id="main" class="flex flex-col justify-center items-center">
+  <div class="flex justify-end items-center w-full max-w-5xl p-4">
+    <button id="addBroker" class="bg-green-700 text-white px-4 py-2 rounded-lg">Add Broker</button>
   </div>
+  
+  <slot></slot>
+
+  <section id="addBrokerForm" class="hidden blur-none pt-20 absolute top-[-0px] bg-black/80 w-full justify-center items-center h-full">
+  <div class="bg-gray-700 flex flex-col rounded-lg w-80 md:w-96 h-auto p-4">
+    <h1 class="text-white text-lg">Add Broker</h1>
+    <form class="flex flex-col mt-3 gap-1" action="/dashboard" method="POST">
+      <label for="broker" class="text-white">Broker Name</label>
+      <input class="bg-gray-200 px-2 py-2 rounded-lg text-black border-1 border-gray-500 focus:outline-3 focus:outline-neutral-400" type="text" id="broker" name="broker" required placeholder="Stockbit" />
+      <label for="cash" class="text-white">Cash</label>
+      <input class="bg-gray-200 px-2 py-2 rounded-lg text-black border-1 border-gray-500 focus:outline-3 focus:outline-neutral-400" type="number" id="cash" name="cash" required placeholder="1000000" />
+      <div class="grid grid-cols-2 gap-4">
+        <button id="cancelButton" class="bg-neutral-400 rounded-lg mt-3 py-1 text-white" type="submit">Cancel</button>
+        <button class="bg-green-700 rounded-lg mt-3 py-1 text-white" type="submit" id="addBroker" name="addBroker" >Add Broker</button>
+      </div>
+    </form>
+  </div>
+  </section>
 </main>
+
+<script is:inline>
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('addBroker');
+    const form = document.getElementById('addBrokerForm');
+    const cancelButton = document.getElementById('cancelButton');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        form.classList.add('flex');
+        form.classList.remove('hidden');
+      });
+      cancelButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        form.classList.add('hidden');
+        form.classList.remove('flex');
+      });
+    }
+  });
+</script>

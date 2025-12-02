@@ -7,10 +7,12 @@ import tailwindcss from '@tailwindcss/vite';
 // https://astro.build/config
 export default defineConfig({
   vite: {
-    plugins: [tailwindcss()]
+    plugins: [
+      tailwindcss()
+    ]
   },
   adapter: node({
-    mode: 'standalone' // atau 'server'
+    mode: 'standalone'
   }),
-  output: 'server', // 🚀 wajib untuk non-prerender
+  output: 'server', 
 });

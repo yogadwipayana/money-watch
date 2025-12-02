@@ -3,31 +3,33 @@ import Link from "../components/link.astro";
 import Logo from "../../public/favicon.svg";
 ---
 
-<div class="css-test bg-amber-40 m-auto flex justify-center items-center">
+<div class="relative z-10 bg-amber-40 w-full m-auto flex justify-center items-center">
   <nav class="bg-fuchsia-40 flex justify-between items-center py-2 mt-1 w-full max-w-5xl">
-    <div class="flex justify-center items-center gap-15">
-      <Logo class="w-15 h-15 text-green-500" />
-      <div class="nav-links duration-500 bg-gray-500 md:static absolute md:min-h-fit min-h-[60vh] left-0 top-[-100%] md:w-auto  w-full flex items-center px-5">
-        <ul class="flex md:flex-row flex-col md:items-center md:gap-[4vw] gap-8">
+    <div class="flex justify-center items-center gap-10">
+      <Logo class="w-15 h-15" />
+      <div id="nav" class="nav-links duration-500 md:static absolute md:min-h-fit min-h-[30vh] left-0 top-[-195%] md:w-auto  w-full flex place-content-center items-center text-center px-5">
+        <ul class="flex md:flex-row flex-col md:items-center md:gap-[2vw] gap-8">
           <li><Link url="/" Class="text-neutral-50 text-xl" content="Home" /></li>
           <li><Link url="/dashboard" Class="text-neutral-50 text-xl" content="Dashboard"/></li>
         </ul>
       </div>
     </div>
-    <div class="gap-3 flex">
-      <Link url="/login" Class="text-neutral-50 text-lg bg-green-500 px-6 py-2 rounded-lg" content="Login"/>
-      <Link url="/register" Class="text-neutral-50 text-lg bg-green-500 px-4 py-2 rounded-lg" content="Register"/>
-      <ion-icon onclick="this.name = this.name === 'menu' ? 'close' : 'menu'; const navLinks = document.querySelector('.nav-links'); if (navLinks) navLinks.classList.toggle('top-[9%]');" name="menu" class="text-white text-5xl"></ion-icon>
+    <div class="gap-2 flex">
+      <Link url="/login" Class="text-neutral-50 z-10 text-lg bg-green-70 px-6 py-2 rounded-lg" content="Login"/>
+      <Link url="/register" Class="text-neutral-50 z-10 text-lg bg-green-700 px-4 py-2 rounded-lg" content="Register"/>
+      <div class="bg-amber-60 grid place-items-center" onclick="onToggleMenu(this)">
+        <ion-icon class="md:hidden text-white text-5xl" onclick="this.name = this.name === 'menu' ? 'close' : 'menu'; const navLinks = document.querySelector('.nav-links'); if (navLinks) navLinks.classList.toggle('top-[90%]');" name="menu"></ion-icon>
+      </div>
     </div>
   </nav>
 </div>
 
-<!-- <script>
-  const navLinks = document.querySelector('.nav-links')
+<script defer>
   function onToggleMenu(e){
-    e.name = e.name === 'menu' ? 'close' : 'menu'
-    if (navLinks) {
-      navLinks.classList.toggle('top-[9%]')
+    const nav = document.getElementById('nav')
+    console.log(e)
+    if (nav) {
+      nav.classList.toggle('bg-gray-600')
     }
   }
-</script> -->
+</script>

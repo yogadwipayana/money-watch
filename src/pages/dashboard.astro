@@ -1,10 +1,137 @@
 ---
-import Layout from '../layouts/layout.astro'
-import Nav from '../layouts/navbar.astro'
-import CardGroups from '../layouts/cardGroups.astro'
+import Layout from "../layouts/layout.astro";
+import Nav from "../layouts/navbar.astro";
+import CardGroups from "../layouts/cardGroups.astro";
+import Card from "../components/card.astro";
+import { isAuthenticated, getAuthToken } from "../utils/auth.js";
+
+// Redirect ke login jika belum terautentikasi
+if (!isAuthenticated(Astro.cookies)) {
+  return Astro.redirect("/login", 302);
+}
+
+const rupiah = (value: number) => {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0, // tanpa decimal
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+// Fetch broker data from API
+let datas:any[] = [];
+
+let errorMessage = "";
+
+async function getDataBrokers() {
+  try {
+    const apiUrl = import.meta.env.API_URL;
+    const cookieHeader = Astro.request.headers.get("cookie") || "";
+    const token = getAuthToken(Astro.cookies);
+
+    const response = await fetch(`${apiUrl}/broker`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    // console.log("Fetched brokers payload:", payload);
+
+    if (Array.isArray(payload?.data)) {
+      const normalizedData = payload.data.map((item: any) => ({
+        broker: (item.brokerName ?? item.broker ?? "Unknown").toString(),
+        cash: Number(item.cashBalance ?? item.cash ?? 0),
+        invested: Number(item.invested ?? 0),
+      }));
+
+      datas = [
+        {
+          message: payload.message ?? "Success",
+          data: normalizedData,
+        },
+      ];
+    } else {
+      datas = [];
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    errorMessage = "An error occurred. Please try again later.";
+  }
+}
+
+if (Astro.request.method === "POST") {
+  const formData = await Astro.request.formData();
+  const brokerName = formData.get("broker");
+  const cashBalance = formData.get("cash");
+  const data = { brokerName, cashBalance };
+  // console.log(data);
+
+  try {
+    const apiUrl = import.meta.env.API_URL;
+    const cookieHeader = Astro.request.headers.get("cookie") || "";
+    const token = getAuthToken(Astro.cookies);
+
+    const response = await fetch(`${apiUrl}/broker`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    } 
+
+    // const payload = await response.json();
+    // console.log("Fetched brokers payload:", payload);
+
+  } catch (error) {
+    console.error("Login error:", error);
+    errorMessage = "An error occurred. Please try again later.";
+  }
+
+  // Redirect akan di-handle oleh middleware untuk menggunakan method GET (303)
+  return Astro.redirect("/dashboard", 302);
+}
+
+await getDataBrokers();
 ---
 
 <Layout title="Dashboard">
-	<Nav></Nav>
-	<CardGroups></CardGroups>
+  <Nav />
+  <CardGroups>
+    <div
+      id="groups"
+      class="bg-gray-80 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 h-auto max-w-6xl"
+    >
+      {
+        (Array.isArray(datas) && datas.length > 0 && Array.isArray(datas[0].data) && datas[0].data.length > 0)
+          ? datas[0].data.map((data: any, i: number) => (
+              <Card
+                broker={data.broker}
+                cash={rupiah(data.cash)}
+                invested={rupiah(data.invested)}
+                equity={rupiah(data.cash + data.invested)}
+              />
+            ))
+          : (
+            <div class="bg-gray-700 w-80 h-52 m-4 rounded-xl shadow-lg flex flex-col p-5 pr-7 justify-center">
+              <h1 class="text-2xl text-white">No data found</h1>
+            </div>
+          )
+      }
+    </div>
+  </CardGroups>
 </Layout>

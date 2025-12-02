@@ -1,0 +1,88 @@
+---
+import Layout from "../layouts/layout.astro";
+import Navbar from "../layouts/navbar.astro";
+import { setAuthToken, isAuthenticated } from "../utils/auth.js";
+
+// Redirect jika sudah login
+if (isAuthenticated(Astro.cookies)) {
+  return Astro.redirect("/dashboard", 302);
+}
+
+let errorMessage = "";
+let formName = "";
+let formEmail = "";
+
+// Handle POST request
+if (Astro.request.method === "POST") {
+  const formData = await Astro.request.formData();
+  const name = formData.get("name");
+  const email = formData.get("email");
+  const password = formData.get("password");
+
+  // Simpan nilai name dan email untuk ditampilkan kembali
+  formName = name?.toString() || "";
+  formEmail = email?.toString() || "";
+
+  // Validate form data
+  if (!name || !email || !password) {
+    errorMessage = "All fields are required";
+  } else {
+    try {
+      const apiUrl = import.meta.env.API_URL;
+      const response = await fetch(`${apiUrl}/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name.toString(),
+          email: email.toString(),
+          password: password.toString(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        errorMessage = data.message || "Registration failed. Please try again.";
+      } else {
+        // Simpan token ke cookie jika berhasil
+        if (data.data?.token) {
+          setAuthToken(Astro.cookies, data.data.token);
+          // Redirect ke dashboard setelah register berhasil
+          return Astro.redirect("/dashboard", 302);
+        } else {
+          errorMessage = "Registration successful but no token received.";
+        }
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      errorMessage = "An error occurred. Please try again later.";
+    }
+  }
+}
+---
+
+<Layout>
+    <Navbar />
+    <main class="bg-gray-60 mx-auto grid place-items-center h-auto mt-8">
+        <div class="bg-gray-700 w-80 md:w-96 p-4 rounded-xl">
+            <h1 class="text-white text-l">Create your account</h1>
+            <p class="text-neutral-400 mb-4">Enter the field below to create your account</p>
+            {errorMessage && (
+                <div class="text-red-500 text-sm">{errorMessage}</div>
+            )}
+            <form class="flex flex-col gap-4" method="POST" action="">
+                <label for="name" class="text-white">Name</label>
+                <input class="bg-gray-600 px-2 py-2 mt-[-12px] rounded-lg text-white border-1 border-gray-500 focus:outline-3 focus:outline-neutral-400" type="text" id="name" name="name" value={formName} placeholder="John Doe" />
+                <label for="email" class="text-white">Email</label>
+                <input class="bg-gray-600 px-2 py-2 mt-[-12px] rounded-lg text-white border-1 border-gray-500 focus:outline-3 focus:outline-neutral-400" type="email" id="email" name="email" value={formEmail} placeholder="m@example.com" />
+                <label for="password" class="text-white">Password</label>
+                <input class="bg-gray-600 px-2 py-2 mt-[-12px] rounded-lg text-white border-1 border-gray-500 focus:outline-3 focus:outline-neutral-400" type="password" id="password" name="password" placeholder="Enter your password" />
+                <button class="bg-green-700 rounded-lg mt-2 py-1 text-white" type="submit">Register</button>
+                <button class="text-white bg-gray-600 rounded-lg mt-[-4px] py-1 border-1 border-gray-500" type="button">Register with Google</button>
+                <h1 class="text-white text-center mt-[-4px]">Already have an account? <a class="underline underline-offset-2" href="/login">Login</a></h1>
+            </form>
+        </div>
+    </main>
+</Layout>

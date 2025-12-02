@@ -3,30 +3,127 @@ import List from "../../components/broker/list.astro";
 import ListGroups from "../../layouts/broker/listGroups.astro";
 import Layout from "../../layouts/layout.astro";
 import Navbar from "../../layouts/navbar.astro";
+import { isAuthenticated, getAuthToken } from "../../utils/auth.js";
 
 export const prerender = false;
+
+// Redirect ke login jika belum terautentikasi
+if (!isAuthenticated(Astro.cookies)) {
+  return Astro.redirect("/login", 302);
+}
+
 const { broker } = Astro.params as { broker: string };
 
-const datas = [{
-  message: "Succes",
-  broker: "ajaib",
-  cash: 1000000,
-  data: [
-    {kode: "BBCA", lot: 10, avgPrice: 1000, lastPrice: 1100},
-    {kode: "BMRI", lot: 5, avgPrice: 2000, lastPrice: 2100},
-    {kode: "BRRI", lot: 15, avgPrice: 1500, lastPrice: 1600}
-  ]
-}]
+function PnL (lot: any, avgPrice: any, lastPrice: any) {
+    return (lastPrice - avgPrice) * lot * 100;
+} 
 
-const detail = datas.find((item) => item.broker === broker);
+let errorMessage = '';
+let datas: any[] = [];
+
+async function getDataHolding() {
+  try {
+    const apiUrl = import.meta.env.API_URL;
+    const cookieHeader = Astro.request.headers.get("cookie") || "";
+    const token = getAuthToken(Astro.cookies);
+
+    const response = await fetch(`${apiUrl}/broker/holding/${broker}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      // Return false untuk menandakan perlu redirect
+      return false;
+    }
+    // console.log(response)
+
+    const payload = await response.json();
+    // console.log("Fetched holding payload:", payload);
+
+    if (Array.isArray(payload?.data)) {
+      const normalizedData = payload.data.map((item: any) => ({
+        code: (item.stockCode ?? "Unknown").toString(),
+        lot: Number(item.quantity ?? 0),
+        AvgPrice: Number(item.averagePrice ?? 0),
+        lastPrice: Number(item.lastPrice ?? 0),
+      }));
+
+      datas = [
+        {
+          message: payload.message ?? "Success",
+          broker,
+          cash: Number(payload.cash ?? 0),
+          data: normalizedData,
+        },
+      ];
+    } else {
+      datas = [];
+    }
+    return true;
+  } catch (error) {
+    console.error("Login error:", error);
+    errorMessage = "An error occurred. Please try again later.";
+    return false;
+  }
+}
+
+let dataFetched = await getDataHolding();
+
+if (Astro.request.method === "DELETE") {
+  const brokerName = broker;
+  const data = { brokerName };
+
+  try {
+    const apiUrl = import.meta.env.API_URL;
+    const cookieHeader = Astro.request.headers.get("cookie") || "";
+    const token = getAuthToken(Astro.cookies);
+
+    const response = await fetch(`${apiUrl}/broker`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    } else {
+      return Astro.redirect('/dashboard', 303);
+    }
+
+    // const payload = await response.json();
+    // console.log("Fetched brokers payload:", response);
+  } catch (error) {
+    console.error("Delete error:", error);
+    // errorMessage = "An error occurred. Please try again later.";
+  }  
+}
+
+// Redirect jika fetch gagal atau broker tidak ditemukan
+if (!dataFetched) {
+  return Astro.redirect('/dashboard', 303);
+}
+
+const detail: any = datas.length > 0
+  ? datas[0]
+  : { broker, cash: 0, data: [] };
+
 ---
 <Layout title={`Dashboard - ${broker}`}>
   {detail ? (
     <>
-      {/* <Navbar /> */}
-      <ListGroups>
-        {detail.data.map((item) => (
-          <List />
+      <Navbar />
+      <ListGroups data={detail} broker={broker}>
+        {detail.data.map((item:any) => (
+          <List code={item.code} lot={item.lot} AvgPrice={item.AvgPrice} lastPrice={item.lastPrice} PnL={PnL(item.lot, item.AvgPrice, item.lastPrice)} />
         ))}
       </ListGroups>
     </>
