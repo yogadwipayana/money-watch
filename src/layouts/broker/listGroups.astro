@@ -28,6 +28,9 @@ function PnL (portofolio: any) {
 const datas = Astro.props.data;
 const broker = Astro.props.broker;
 
+let errorMessage;
+let successMessage ='done';
+
 const pnl = PnL(datas);
 const totalPortofolio = hitungTotalPortofolio(datas);
 const profit = (pnl / (totalPortofolio - pnl)) * 100;
@@ -42,6 +45,8 @@ const profitDisplay = profit.toFixed(2) + "%";
         <button id="removeBroker" data-broker={broker} class="bg-red-700 text-white px-4 py-1 rounded-lg">Remove {broker}</button>
     </div>
     <div class="bg-red-60 relative mt-5 max-w-6xl h-auto flex flex-col justify-center items-center ">
+      <h1 class="bg-red-600 text-white w-full text-right px-2">{errorMessage}</h1>
+      <!-- <h1 class="bg-green-600 text-white w-full text-right px-2">{successMessage}</h1> -->
         <span class="bg-amber-60 max-w-2xl h-auto grid grid-cols-1 md:grid-cols-2 my-5 gap-5  ">
             <div class="bg-gray-700 text-neutral-300 max-w-96 grid grid-cols-2 place-content-center p-2 gap-5 rounded-lg">
                 <span>

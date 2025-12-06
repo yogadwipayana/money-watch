@@ -155,6 +155,7 @@ if (Astro.request.method === "POST") {
     
     const success = await postHolding(payload, 'deposit', Astro.cookies, Astro.request);
     if (success) {
+      console.log("success: ", success.data.message);
       return Astro.redirect(`/dashboard/${broker}`, 303);
     }
   } else if (transaction === 'withdraw') {

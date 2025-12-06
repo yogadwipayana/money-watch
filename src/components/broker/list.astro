@@ -12,7 +12,9 @@ function number(x: any) {
 }
 
 function PnLPersentase(AvgPrice: number, lastPrice: number) {
-  return ((lastPrice - AvgPrice) / AvgPrice) * 100;
+  const percentage = ((lastPrice - AvgPrice) / AvgPrice) * 100;
+  const formatted = Math.abs(percentage).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return percentage < 0 ? `(${formatted})` : formatted;
 }
 
 const {code, lot, AvgPrice, lastPrice, PnL} = Astro.props;
@@ -25,7 +27,7 @@ const {code, lot, AvgPrice, lastPrice, PnL} = Astro.props;
     </div>
     <div class="bg-gray-60 col-span-2 text-nowrap text-white text-md text-end pr-5">
         <p>{rupiah(lastPrice * lot * 100)}</p>
-        <p>{rupiah(PnL)} ({ PnLPersentase(AvgPrice, lastPrice).toFixed(2) }%)</p>
+        <p>{rupiah(PnL)} ({ PnLPersentase(AvgPrice, lastPrice) }%)</p>
         <p class="text-neutral-400">{lot} Lot | Avg { number(AvgPrice)}</p>
     </div>
     <div class="text-white text-md text-end flex flex-col justify-center">

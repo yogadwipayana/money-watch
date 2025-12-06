@@ -32,7 +32,9 @@ export async function postHolding(data, type, cookies, request) {
       throw new Error(`Request failed with status ${response.status}`);
     }
 
-    return true;
+    const responseData = await response.json();
+
+    return { success: true, data: responseData };
   } catch (error) {
     console.error("Transaction error:", error);
     return false;
