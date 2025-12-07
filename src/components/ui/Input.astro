@@ -1,0 +1,42 @@
+---
+const {
+  type = "text",
+  label = "",
+  error = "",
+  required = false,
+  placeholder = "",
+  name = "",
+  value = "",
+  id = name,
+  class: className = "",
+  ...props
+} = Astro.props;
+
+const baseClasses = "w-full px-4 py-3 rounded-lg border transition-all duration-200";
+const normalClasses = "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
+const errorClasses = "border-red-500 focus:ring-red-500";
+---
+
+<div class="flex flex-col gap-2">
+  {label && (
+    <label for={id} class="text-sm font-medium text-gray-700 dark:text-gray-300">
+      {label}
+      {required && <span class="text-red-500 ml-1">*</span>}
+    </label>
+  )}
+  
+  <input
+    type={type}
+    id={id}
+    name={name}
+    value={value}
+    placeholder={placeholder}
+    required={required}
+    class:list={[baseClasses, error ? errorClasses : normalClasses, className]}
+    {...props}
+  />
+  
+  {error && (
+    <p class="text-sm text-red-500 mt-1">{error}</p>
+  )}
+</div>

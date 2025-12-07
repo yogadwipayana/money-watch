@@ -32,6 +32,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 # Set environment to production
 ENV NODE_ENV=production
+ENV API_URL=${API_URL}
 
 # Copy package files
 COPY package*.json ./

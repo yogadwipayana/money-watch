@@ -1,192 +1,467 @@
 ---
-import List from "../../components/broker/list.astro";
-import ListGroups from "../../layouts/broker/listGroups.astro";
 import Layout from "../../layouts/layout.astro";
 import Navbar from "../../layouts/navbar.astro";
-import { isAuthenticated, getAuthToken } from "../../utils/auth.js";
-import { postHolding } from "../../utils/postHolding.js";
+import Card from "../../components/ui/Card.astro";
+import Button from "../../components/ui/Button.astro";
+import Badge from "../../components/ui/Badge.astro";
+import Modal from "../../components/ui/Modal.astro";
+import Input from "../../components/ui/Input.astro";
+import { isAuthenticated } from "../../utils/auth.js";
+import { fetchHoldings, createTransaction, deleteBroker, apiRequest } from "../../utils/api.js";
+import { formatCurrency, formatPercentage, formatNumber } from "../../utils/format.js";
+import { calculateStockPL, calculateTotalPL, calculateProfitPercentage, calculateTotalInvested } from "../../utils/calculations.js";
 
 export const prerender = false;
 
-// Redirect ke login jika belum terautentikasi
 if (!isAuthenticated(Astro.cookies)) {
   return Astro.redirect("/login", 302);
 }
 
-const { broker } = Astro.params as { broker: string };
+const brokerIdParam = Astro.params.broker;
+const brokerId = brokerIdParam ? parseInt(brokerIdParam) : null;
 
-function PnL (lot: any, avgPrice: any, lastPrice: any) {
-    return (lastPrice - avgPrice) * lot * 100;
-} 
-
-let errorMessage = '';
-let datas: any[] = [];
-
-async function getDataHolding() {
-  try {
-    const apiUrl = import.meta.env.API_URL;
-    const cookieHeader = Astro.request.headers.get("cookie") || "";
-    const token = getAuthToken(Astro.cookies);
-
-    const response = await fetch(`${apiUrl}/broker/holding/${broker}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-
-    if (!response.ok) {
-      // Return false untuk menandakan perlu redirect
-      return false;
-    }
-    // console.log(response)
-
-    const payload = await response.json();
-    // console.log("Fetched holding payload:", payload);
-
-    if (Array.isArray(payload?.data)) {
-      const normalizedData = payload.data.map((item: any) => ({
-        code: (item.stockCode ?? "Unknown").toString(),
-        lot: Number(item.quantity ?? 0),
-        AvgPrice: Number(item.averagePrice ?? 0),
-        lastPrice: Number(item.lastPrice ?? 0),
-      }));
-
-      datas = [
-        {
-          message: payload.message ?? "Success",
-          broker,
-          cash: Number(payload.cash ?? 0),
-          data: normalizedData,
-        },
-      ];
-    } else {
-      datas = [];
-    }
-    return true;
-  } catch (error) {
-    console.error("Login error:", error);
-    errorMessage = "An error occurred. Please try again later.";
-    return false;
-  }
+if (!brokerId) {
+  return Astro.redirect("/dashboard", 303);
 }
 
-let dataFetched = await getDataHolding();
+let broker = null;
+let holdings = [];
+let errorMessage = "";
 
-// Redirect jika fetch gagal atau broker tidak ditemukan
-if (!dataFetched) {
-  return Astro.redirect('/dashboard', 303);
-}
-
-if (Astro.request.method === "DELETE") {
-  const brokerName = broker;
-  const data = { brokerName };
-
-  try {
-    const apiUrl = import.meta.env.API_URL;
-    const cookieHeader = Astro.request.headers.get("cookie") || "";
-    const token = getAuthToken(Astro.cookies);
-
-    const response = await fetch(`${apiUrl}/broker`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(data)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
-    } else {
-      return Astro.redirect('/dashboard', 303);
-    }
-
-    // const payload = await response.json();
-    // console.log("Fetched brokers payload:", response);
-  } catch (error) {
-    console.error("Delete error:", error);
-    // errorMessage = "An error occurred. Please try again later.";
-  }  
-}
-
+// Handle POST - Create Transaction
 if (Astro.request.method === "POST") {
-  const formData = await Astro.request.formData();
-  const transaction = formData.get("transaction");
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get("action")?.toString();
 
-  if (transaction === 'buy') {
-    const stockCode = (formData.get("code") ?? "").toString().toUpperCase();
-    const price = Number(formData.get("price") ?? 0);
-    const quantity = Number(formData.get("lot") ?? 0);
+    if (action === "delete") {
+      await deleteBroker(brokerId, Astro.cookies);
+      return Astro.redirect("/dashboard", 303);
+    } else {
+      const transactionType = formData.get("transactionType")?.toString();
+      
+      // Build transaction data according to API spec
+      const transactionData: any = {
+        brokerId: brokerId,
+        type: transactionType?.toUpperCase(), // Change to 'type' and UPPERCASE
+        transactionDate: new Date().toISOString(),
+      };
 
-    const payload = {
-      brokerName: broker,
-      stockCode,
-      quantity,
-      price
-    };
+      if (transactionType === "buy" || transactionType === "sell") {
+        // For buy/sell transactions: stockSymbol, quantity, price
+        transactionData.stockSymbol = formData.get("stockCode")?.toString().toUpperCase();
+        transactionData.quantity = parseInt(formData.get("quantity")?.toString() || "0");
+        transactionData.price = parseFloat(formData.get("price")?.toString() || "0");
+      } else {
+        // For deposit/withdrawal: amount
+        transactionData.amount = parseFloat(formData.get("amount")?.toString() || "0");
+      }
 
-    const success = await postHolding(payload, 'buy', Astro.cookies, Astro.request);
-    if (success) {
-      return Astro.redirect(`/dashboard/${broker}`, 303);
+      console.log("Creating transaction with data:", transactionData);
+      await createTransaction(transactionData, Astro.cookies);
+      return Astro.redirect(`/dashboard/${brokerId}`, 303);
     }
-  } else if (transaction === 'sell') {
-    const stockCode = (formData.get("code") ?? "").toString().toUpperCase();
-    const price = Number(formData.get("price") ?? 0);
-    const quantity = Number(formData.get("lot") ?? 0);
-
-    const payload = {
-      brokerName: broker,
-      stockCode,
-      quantity,
-      price
-    };
-
-    const success = await postHolding(payload, 'sell', Astro.cookies, Astro.request);
-    if (success) {
-      return Astro.redirect(`/dashboard/${broker}`, 303);
-    }
-  } else if (transaction === 'deposit') {
-    const cashBalance = formData.get("cash");
-    const payload = { brokerName: broker, cashBalance };
-    
-    const success = await postHolding(payload, 'deposit', Astro.cookies, Astro.request);
-    if (success) {
-      console.log("success: ", success.data.message);
-      return Astro.redirect(`/dashboard/${broker}`, 303);
-    }
-  } else if (transaction === 'withdraw') {
-    const cashBalance = formData.get("cash");
-    const payload = { brokerName: broker, cashBalance };
-    
-    const success = await postHolding(payload, 'withdraw', Astro.cookies, Astro.request);
-    if (success) {
-      return Astro.redirect(`/dashboard/${broker}`, 303);
-    }
-  } else {
-    console.log("No valid transaction type selected.");
+  } catch (error) {
+    console.error("Transaction error:", error instanceof Error ? error.message : String(error));
+    errorMessage = (error instanceof Error ? error.message : "Failed to process transaction.") || "Failed to process transaction.";
   }
 }
 
-const detail: any = datas.length > 0
-  ? datas[0]
-  : { broker, cash: 0, data: [] };
+// Fetch broker and holdings data
+try {
+  const response = await apiRequest(`/broker/${brokerId}`, { method: "GET" }, Astro.cookies);
+  // console.log("Broker API response:", response);
+  broker = response.data || response;
+  
+  holdings = await fetchHoldings(brokerId, Astro.cookies);
+} catch (error) {
+  console.error("Fetch get data error:", error instanceof Error ? error.message : String(error));
+  console.error("Full error:", error);
+  errorMessage = error instanceof Error ? error.message : "Failed to load broker data";
+  // return Astro.redirect("/dashboard", 303);
+}
 
+const totalInvested = calculateTotalInvested(holdings);
+const totalPL = calculateTotalPL(holdings);
+const profitPercentage = calculateProfitPercentage(totalPL, totalInvested);
+const totalPortfolio = (Number(broker?.balance) || 0) + totalInvested;
 ---
-<Layout title={`Dashboard - ${broker}`}>
-  {detail ? (
-    <>
-      <Navbar />
-      <ListGroups data={detail} broker={broker}>
-        {detail.data.map((item:any) => (
-          <List code={item.code} lot={item.lot} AvgPrice={item.AvgPrice} lastPrice={item.lastPrice} PnL={PnL(item.lot, item.AvgPrice, item.lastPrice)} />
-        ))}
-      </ListGroups>
-    </>
-  ) : (
-    <h1>Broker "{broker}" tidak ditemukan 🚫</h1>
-  )}
+
+<Layout title={`${broker?.name || 'Broker Detail'} - Broker Detail`}>
+  <Navbar />
+  
+  <main class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- Breadcrumb -->
+      <nav class="mb-6">
+        <ol class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          <li><a href="/dashboard" class="hover:text-blue-600 dark:hover:text-blue-400">Dashboard</a></li>
+          <li><i class="fa-solid fa-chevron-right text-xs"></i></li>
+          <li class="text-gray-900 dark:text-white font-medium">{broker.name}</li>
+        </ol>
+      </nav>
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            {broker.name}
+          </h1>
+          <p class="text-gray-600 dark:text-gray-400">
+            Manage your holdings and transactions
+          </p>
+        </div>
+        
+        <div class="flex gap-3 flex-wrap">
+          <Button variant="primary" onclick="openModal('addTransactionModal')">
+            <i class="fa-solid fa-plus mr-2"></i>
+            Add Transaction
+          </Button>
+          <Button variant="outline" onclick={`location.href='/dashboard/${brokerId}/transaction'`}>
+            <i class="fa-solid fa-clock-rotate-left mr-2"></i>
+            History
+          </Button>
+          <Button variant="danger" onclick="openModal('deleteBrokerModal')">
+            <i class="fa-solid fa-trash mr-2"></i>
+            Remove
+          </Button>
+        </div>
+      </div>
+
+      {errorMessage && (
+        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 px-4 py-3 rounded-lg mb-6">
+          {errorMessage}
+        </div>
+      )}
+
+      <!-- Portfolio Summary Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        
+        <!-- Left Card - Portfolio Value -->
+        <Card variant="elevated" padding="lg">
+          <div class="mb-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Portfolio Value
+            </h3>
+            <p class="text-4xl font-bold text-gray-900 dark:text-white">
+              {formatCurrency(totalPortfolio)}
+            </p>
+          </div>
+          
+          <div class:list={["flex items-center gap-2", totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"]}>
+            <i class:list={["fa-solid", totalPL >= 0 ? "fa-arrow-up" : "fa-arrow-down"]}></i>
+            <span class="text-lg font-semibold">
+              {formatCurrency(Math.abs(totalPL))} ({formatPercentage(profitPercentage)})
+            </span>
+          </div>
+        </Card>
+
+        <!-- Right Card - Financial Details -->
+        <Card variant="elevated" padding="lg">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            Financial Details
+          </h3>
+          
+          <div class="grid grid-cols-2 gap-6">
+            <div>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Cash</p>
+              <p class="text-xl font-bold text-gray-900 dark:text-white">
+                {formatCurrency(Number(broker.balance) || 0)}
+              </p>
+            </div>
+            
+            <div>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Invested</p>
+              <p class="text-xl font-bold text-gray-900 dark:text-white">
+                {formatCurrency(totalInvested)}
+              </p>
+            </div>
+            
+            <div>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">P&L</p>
+              <p class:list={["text-xl font-bold", totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"]}>
+                {formatCurrency(totalPL)}
+              </p>
+            </div>
+            
+            <div>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Profit</p>
+              <p class:list={["text-xl font-bold", profitPercentage >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"]}>
+                {formatPercentage(profitPercentage)}
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <!-- Stock Holdings -->
+      <Card variant="elevated" padding="none">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+            Stock Holdings
+          </h2>
+        </div>
+        
+        {holdings.length > 0 ? (
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Stock Code
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Total Value
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    P&L
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Quantity
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Current Price
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {holdings.map((holding) => {
+                  const currentPrice = holding.currentPrice || holding.averagePrice;
+                  const stockPL = holding.profitLoss || calculateStockPL(currentPrice, holding.averagePrice, holding.quantity);
+                  const stockPLPercent = holding.profitLossPercentage || ((currentPrice - holding.averagePrice) / holding.averagePrice * 100);
+                  const totalValue = holding.currentValue || (holding.quantity * currentPrice * 100);
+                  
+                  return (
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <td class="px-6 py-4">
+                        <div class="flex items-center">
+                          <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mr-3">
+                            <span class="text-blue-600 dark:text-blue-300 font-semibold text-sm">
+                              {(holding.stockSymbol || '--').substring(0, 2)}
+                            </span>
+                          </div>
+                          <div>
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">
+                              {holding.stockSymbol || 'N/A'}
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                              Avg: {formatNumber(holding.averagePrice)}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 text-right">
+                        <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                          {formatCurrency(totalValue)}
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 text-right">
+                        <div class:list={["text-sm font-semibold", stockPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"]}>
+                          {formatCurrency(Math.abs(stockPL))}
+                        </div>
+                        <div class:list={["text-xs", stockPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"]}>
+                          ({formatPercentage(stockPLPercent)})
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 text-right">
+                        <div class="text-sm text-gray-900 dark:text-white">
+                          {holding.quantity} Lot
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 text-right">
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">
+                          {formatNumber(holding.currentPrice || holding.averagePrice)}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div class="p-12 text-center">
+            <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i class="fa-solid fa-chart-line fa-2x text-gray-400 dark:text-gray-500"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No Holdings Yet
+            </h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">
+              Start by adding your first buy transaction
+            </p>
+            <Button variant="primary" onclick="openModal('addTransactionModal')">
+              <i class="fa-solid fa-plus mr-2"></i>
+              Add Transaction
+            </Button>
+          </div>
+        )}
+      </Card>
+    </div>
+  </main>
+
+  <!-- Add Transaction Modal -->
+  <Modal id="addTransactionModal" title="Add Transaction" size="lg">
+    <form method="POST" class="space-y-4" id="transactionForm">
+      <div>
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
+          Transaction Type
+        </label>
+        <div class="grid grid-cols-4 gap-3">
+          <label class="relative">
+            <input type="radio" name="transactionType" value="buy" class="peer sr-only" required />
+            <div class="cursor-pointer rounded-lg border-2 border-gray-300 dark:border-gray-600 p-4 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 transition-all" onclick="document.querySelector('input[value=buy]').click()">
+              <i class="fa-solid fa-arrow-trend-up text-blue-500 mb-2"></i>
+              <div class="text-sm font-medium text-gray-900 dark:text-white">Buy</div>
+            </div>
+          </label>
+          
+          <label class="relative">
+            <input type="radio" name="transactionType" value="sell" class="peer sr-only" />
+            <div class="cursor-pointer rounded-lg border-2 border-gray-300 dark:border-gray-600 p-4 text-center peer-checked:border-orange-500 peer-checked:bg-orange-50 dark:peer-checked:bg-orange-900/20 transition-all" onclick="document.querySelector('input[value=sell]').click()">
+              <i class="fa-solid fa-arrow-trend-down text-orange-500 mb-2"></i>
+              <div class="text-sm font-medium text-gray-900 dark:text-white">Sell</div>
+            </div>
+          </label>
+          
+          <label class="relative">
+            <input type="radio" name="transactionType" value="deposit" class="peer sr-only" />
+            <div class="cursor-pointer rounded-lg border-2 border-gray-300 dark:border-gray-600 p-4 text-center peer-checked:border-green-500 peer-checked:bg-green-50 dark:peer-checked:bg-green-900/20 transition-all" onclick="document.querySelector('input[value=deposit]').click()">
+              <i class="fa-solid fa-plus text-green-500 mb-2"></i>
+              <div class="text-sm font-medium text-gray-900 dark:text-white">Deposit</div>
+            </div>
+          </label>
+          
+          <label class="relative">
+            <input type="radio" name="transactionType" value="withdrawal" class="peer sr-only" />
+            <div class="cursor-pointer rounded-lg border-2 border-gray-300 dark:border-gray-600 p-4 text-center peer-checked:border-red-500 peer-checked:bg-red-50 dark:peer-checked:bg-red-900/20 transition-all" onclick="document.querySelector('input[value=withdrawal]').click()">
+              <i class="fa-solid fa-minus text-red-500 mb-2"></i>
+              <div class="text-sm font-medium text-gray-900 dark:text-white">Withdraw</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div id="stockFields" class="space-y-4 hidden">
+        <Input
+          type="text"
+          name="stockCode"
+          label="Stock Code"
+          placeholder="BBRI"
+          class="uppercase"
+        />
+        
+        <div class="grid grid-cols-2 gap-4">
+          <Input
+            type="number"
+            name="quantity"
+            label="Quantity (Lot)"
+            placeholder="10"
+            min="1"
+          />
+          
+          <Input
+            type="number"
+            name="price"
+            label="Price per Share"
+            placeholder="4500"
+            min="1"
+          />
+        </div>
+      </div>
+
+      <div id="cashFields" class="hidden">
+        <Input
+          type="number"
+          name="amount"
+          label="Amount"
+          placeholder="1000000"
+          min="1"
+        />
+      </div>
+
+      <div class="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <Button type="button" variant="ghost" fullWidth={true} onclick="closeModal('addTransactionModal')">
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" fullWidth={true}>
+          Add Transaction
+        </Button>
+      </div>
+    </form>
+  </Modal>
+
+  <!-- Delete Broker Confirmation Modal -->
+  <Modal id="deleteBrokerModal" title="Delete Broker" size="sm">
+    <div class="text-center mb-6">
+      <div class="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fa-solid fa-triangle-exclamation fa-2x text-red-600 dark:text-red-400"></i>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        Are you sure?
+      </h3>
+      <p class="text-gray-600 dark:text-gray-400">
+        This will permanently delete <strong>{broker.name}</strong> and all associated holdings and transactions. This action cannot be undone.
+      </p>
+    </div>
+    
+    <form method="POST">
+      <input type="hidden" name="action" value="delete" />
+      <div class="flex gap-3">
+        <Button type="button" variant="ghost" fullWidth={true} onclick="closeModal('deleteBrokerModal')">
+          Cancel
+        </Button>
+        <Button type="submit" variant="danger" fullWidth={true}>
+          Delete Broker
+        </Button>
+      </div>
+    </form>
+  </Modal>
+
+  <script>
+    function toggleTransactionFields() {
+      setTimeout(() => {
+        const transactionType = document.querySelector('input[name="transactionType"]:checked')?.value;
+        const stockFields = document.getElementById('stockFields');
+        const cashFields = document.getElementById('cashFields');
+        
+        if (!stockFields || !cashFields) return;
+        
+        if (transactionType === 'buy' || transactionType === 'sell') {
+          stockFields.classList.remove('hidden');
+          cashFields.classList.add('hidden');
+          
+          // Make stock fields required
+          stockFields.querySelectorAll('input').forEach(input => input.required = true);
+          cashFields.querySelectorAll('input').forEach(input => input.required = false);
+        } else if (transactionType === 'deposit' || transactionType === 'withdrawal') {
+          stockFields.classList.add('hidden');
+          cashFields.classList.remove('hidden');
+          
+          // Make cash fields required
+          stockFields.querySelectorAll('input').forEach(input => input.required = false);
+          cashFields.querySelectorAll('input').forEach(input => input.required = true);
+        }
+      }, 0);
+    }
+
+    // Initialize transaction field visibility on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set up event listeners for radio buttons
+      const radioButtons = document.querySelectorAll('input[name="transactionType"]');
+      radioButtons.forEach(radio => {
+        radio.addEventListener('change', toggleTransactionFields);
+      });
+    });
+
+    // Also call when modal is opened
+    const modal = document.getElementById('addTransactionModal');
+    if (modal) {
+      const observer = new MutationObserver(() => {
+        toggleTransactionFields();
+      });
+      observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+    }
+  </script>
 </Layout>

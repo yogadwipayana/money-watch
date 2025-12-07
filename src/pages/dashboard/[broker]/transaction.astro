@@ -1,4 +1,324 @@
 ---
-const { broker } = Astro.params;
+import Layout from "../../../layouts/layout.astro";
+import Navbar from "../../../layouts/navbar.astro";
+import Card from "../../../components/ui/Card.astro";
+import Button from "../../../components/ui/Button.astro";
+import Badge from "../../../components/ui/Badge.astro";
+import Input from "../../../components/ui/Input.astro";
+import Modal from "../../../components/ui/Modal.astro";
+import { isAuthenticated } from "../../../utils/auth.js";
+import { fetchTransactions, deleteTransaction, apiRequest } from "../../../utils/api.js";
+import { formatCurrency, formatDate, formatNumber } from "../../../utils/format.js";
+
+export const prerender = false;
+
+if (!isAuthenticated(Astro.cookies)) {
+  return Astro.redirect("/login", 302);
+}
+
+const brokerIdParam = Astro.params.broker;
+// console.log("Broker ID Param:", Astro.params);
+const brokerId = brokerIdParam ? parseInt(brokerIdParam) : null;
+// console.log("Parsed Broker ID:", brokerId);
+
+if (!brokerId) {
+  return Astro.redirect(`/dashboard/${brokerId}`, 303);
+}
+
+let broker = null;
+let transactions = [];
+let errorMessage = "";
+
+// Handle DELETE transaction
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    const transactionId = formData.get("transactionId")?.toString();
+    
+    if (transactionId) {
+      await deleteTransaction(parseInt(transactionId), Astro.cookies);
+      return Astro.redirect(`/dashboard/${brokerId}/transaction`, 303);
+    }
+  } catch (error) {
+    console.error("Delete transaction error:", error);
+    errorMessage = (error instanceof Error ? error.message : "Failed to delete transaction.");
+  }
+}
+
+// Fetch broker info
+try {
+  const response = await apiRequest(`/broker/${brokerId}`, { method: "GET" }, Astro.cookies);
+  broker = response.data || response;
+} catch (error) {
+  console.error("Fetch broker error:", error);
+  return Astro.redirect(`/dashboard/${brokerId}`, 303);
+}
+
+// Get filter parameters
+const url = new URL(Astro.request.url);
+const searchQuery = url.searchParams.get("search") || "";
+const dateFrom = url.searchParams.get("date_from") || "";
+const dateTo = url.searchParams.get("date_to") || "";
+const typeFilter = url.searchParams.get("type") || "";
+
+// Fetch transactions with filters
+try {
+  const filters: any = { brokerId: brokerId };
+  if (dateFrom) filters.date_from = dateFrom;
+  if (dateTo) filters.date_to = dateTo;
+  if (typeFilter) filters.type = typeFilter;
+  if (searchQuery) filters.search = searchQuery;
+  // console.log("Fetching transactions with filters:", filters);
+  
+  transactions = await fetchTransactions(filters, Astro.cookies);
+  // console.log("Fetched transactions:", transactions);
+} catch (error) {
+  console.error("Fetch transactions error:", error);
+  errorMessage = "Failed to load transactions.";
+}
+
+const transactionTypes = [
+  { value: "", label: "All Transactions" },
+  { value: "BUY", label: "Buy" },
+  { value: "SELL", label: "Sell" },
+  { value: "DEPOSIT", label: "Deposit" },
+  { value: "WITHDRAW", label: "Withdraw" },
+];
 ---
-<h1>Transaksi broker: {broker}</h1>
+
+<Layout title={`${broker?.name || 'Transaction History'} - Transaction History`}>
+  <Navbar />
+  
+  <main class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- Breadcrumb -->
+      <nav class="mb-6">
+        <ol class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          <li><a href="/dashboard" class="hover:text-blue-600 dark:hover:text-blue-400">Dashboard</a></li>
+          <li><i class="fa-solid fa-chevron-right text-xs"></i></li>
+          <li><a href={`/dashboard/${brokerId}`} class="hover:text-blue-600 dark:hover:text-blue-400">{broker?.name || "Broker"}</a></li>
+          <li><i class="fa-solid fa-chevron-right text-xs"></i></li>
+          <li class="text-gray-900 dark:text-white font-medium">Transactions</li>
+        </ol>
+      </nav>
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Transaction History
+          </h1>
+          <p class="text-gray-600 dark:text-gray-400">
+            {broker?.name || "Broker"} - All transactions
+          </p>
+        </div>
+        
+        <Button variant="outline" onclick={`location.href='/dashboard/${brokerId}'`}>
+          <i class="fa-solid fa-arrow-left mr-2"></i>
+          Back to Broker
+        </Button>
+      </div>
+
+      {errorMessage && (
+        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 px-4 py-3 rounded-lg mb-6">
+          {errorMessage}
+        </div>
+      )}
+
+      <!-- Filters -->
+      <Card variant="elevated" padding="md" class="mb-6">
+        <form method="GET" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Input
+              type="text"
+              name="search"
+              label="Search Stock"
+              placeholder="BBRI"
+              value={searchQuery}
+            />
+            
+            <Input
+              type="date"
+              name="date_from"
+              label="From Date"
+              value={dateFrom}
+            />
+            
+            <Input
+              type="date"
+              name="date_to"
+              label="To Date"
+              value={dateTo}
+            />
+            
+            <div class="flex flex-col gap-2">
+              <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Type
+              </label>
+              <select
+                name="type"
+                class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {transactionTypes.map(type => (
+                  <option value={type.value} selected={typeFilter === type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <div class="flex gap-3">
+            <Button type="submit" variant="primary">
+              <i class="fa-solid fa-magnifying-glass mr-2"></i>
+              Apply Filters
+            </Button>
+            <Button type="button" variant="ghost" onclick={`location.href='/dashboard/${brokerId}/transaction'`}>
+              Clear Filters
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <!-- Transactions Table -->
+      <Card variant="elevated" padding="none">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+            All Transactions ({transactions.length})
+          </h2>
+        </div>
+        
+        {transactions.length > 0 ? (
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Stock
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Quantity
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Price
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Total
+                  </th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {transactions.map((transaction) => (
+                  <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm text-gray-900 dark:text-white">
+                        {formatDate(transaction.createdAt, true)}
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <Badge variant={transaction.type || "default"} size="md" rounded={true}>
+                        {transaction.type || "-"}
+                      </Badge>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm font-medium text-gray-900 dark:text-white">
+                        {transaction.stockSymbol || "-"}
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                      <div class="text-sm text-gray-900 dark:text-white">
+                        {transaction.quantity ? `${transaction.quantity} Lot` : "-"}
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                      <div class="text-sm text-gray-900 dark:text-white">
+                        {transaction.price ? formatNumber(transaction.price) : "-"}
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                      <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(transaction.amount)}
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                      <button
+                        type="button"
+                        onclick={`openDeleteModal(${transaction.id})`}
+                        class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                        title="Delete transaction"
+                      >
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div class="p-12 text-center">
+            <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i class="fa-solid fa-receipt fa-2x text-gray-400 dark:text-gray-500"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No Transactions Found
+            </h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">
+              {searchQuery || dateFrom || dateTo || typeFilter 
+                ? "Try adjusting your filters" 
+                : "Start by adding your first transaction"}
+            </p>
+            <Button variant="primary" onclick={`location.href='/dashboard/${brokerId}'`}>
+              <i class="fa-solid fa-plus mr-2"></i>
+              Add Transaction
+            </Button>
+          </div>
+        )}
+      </Card>
+    </div>
+  </main>
+
+  <!-- Delete Transaction Confirmation Modal -->
+  <Modal id="deleteTransactionModal" title="Delete Transaction" size="sm">
+    <div class="text-center mb-6">
+      <div class="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fa-solid fa-triangle-exclamation fa-2x text-red-600 dark:text-red-400"></i>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        Delete Transaction?
+      </h3>
+      <p class="text-gray-600 dark:text-gray-400">
+        This will permanently delete this transaction and reverse its effects on your portfolio. This action cannot be undone.
+      </p>
+    </div>
+    
+    <form method="POST" id="deleteForm">
+      <input type="hidden" name="transactionId" id="deleteTransactionId" />
+      <div class="flex gap-3">
+        <Button type="button" variant="ghost" fullWidth={true} onclick="closeModal('deleteTransactionModal')">
+          Cancel
+        </Button>
+        <Button type="submit" variant="danger" fullWidth={true}>
+          Delete Transaction
+        </Button>
+      </div>
+    </form>
+  </Modal>
+
+  <script is:inline>
+    function openDeleteModal(transactionId) {
+      document.getElementById('deleteTransactionId').value = transactionId;
+      openModal('deleteTransactionModal');
+    }
+  </script>
+</Layout>

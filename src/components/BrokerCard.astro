@@ -1,0 +1,53 @@
+---
+import Card from "./ui/Card.astro";
+import { formatCurrency } from "../utils/format.js";
+
+const { broker, cash, invested, id } = Astro.props;
+
+const totalEquity = cash + invested;
+const brokerSlug = broker.toLowerCase().replace(/\s+/g, '-');
+---
+
+<Card variant="elevated" padding="md" hover={true} clickable={true}>
+  <a href={`/dashboard/${id}`} class="block">
+    <div class="flex items-start justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+          <span class="text-blue-600 dark:text-blue-300 font-semibold text-lg">
+            {broker.substring(0, 2).toUpperCase()}
+          </span>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+          {broker}
+        </h2>
+      </div>
+      <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+        <i class="fa-solid fa-arrow-right text-gray-600 dark:text-gray-300"></i>
+      </div>
+    </div>
+    
+    <div class="mb-4">
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Equity</p>
+      <p class="text-2xl font-bold text-gray-900 dark:text-white">
+        {formatCurrency(totalEquity)}
+      </p>
+    </div>
+    
+    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <p class="text-xs uppercase text-gray-400 dark:text-gray-500 mb-1">Cash</p>
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">
+            {formatCurrency(cash)}
+          </p>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-gray-400 dark:text-gray-500 mb-1">Invested</p>
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">
+            {formatCurrency(invested)}
+          </p>
+        </div>
+      </div>
+    </div>
+  </a>
+</Card>

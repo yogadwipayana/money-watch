@@ -1,0 +1,65 @@
+---
+import Modal from "./ui/Modal.astro";
+import Input from "./ui/Input.astro";
+import Button from "./ui/Button.astro";
+---
+
+<Modal id="addBrokerModal" title="Add New Broker" size="md">
+  <form method="POST" action="/dashboard" class="space-y-4" onsubmit="return validateBrokerForm()">
+    <Input
+      type="text"
+      name="name"
+      id="brokerName"
+      label="Broker Name"
+      placeholder="e.g., Stockbit, Ajaib, etc."
+      required={true}
+      minlength="2"
+    />
+    
+    <Input
+      type="number"
+      name="balance"
+      id="cashBalance"
+      label="Initial Cash Balance"
+      placeholder="1000000"
+      required={true}
+      min="1"
+      step="1"
+    />
+    
+    <div id="brokerFormError" class="hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 px-4 py-3 rounded-lg text-sm">
+    </div>
+    
+    <div class="flex gap-3 pt-4">
+      <Button type="button" variant="ghost" fullWidth={true} onclick="closeModal('addBrokerModal')">
+        Cancel
+      </Button>
+      <Button type="submit" variant="primary" fullWidth={true}>
+        Add Broker
+      </Button>
+    </div>
+  </form>
+</Modal>
+
+<script is:inline>
+  function validateBrokerForm() {
+    const brokerName = document.getElementById('brokerName').value.trim();
+    const cashBalance = document.getElementById('cashBalance').value;
+    const errorDiv = document.getElementById('brokerFormError');
+    
+    if (!brokerName || brokerName.length < 2) {
+      errorDiv.textContent = 'Broker name must be at least 2 characters';
+      errorDiv.classList.remove('hidden');
+      return false;
+    }
+    
+    if (!cashBalance || parseFloat(cashBalance) <= 0) {
+      errorDiv.textContent = 'Cash balance must be greater than 0';
+      errorDiv.classList.remove('hidden');
+      return false;
+    }
+    
+    errorDiv.classList.add('hidden');
+    return true;
+  }
+</script>
