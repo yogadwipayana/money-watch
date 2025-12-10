@@ -25,3 +25,11 @@ pnpm-debug.log*
 
 acli.exe
 AGENTS.md
+VIEW-AGENTS.md
+
+# SSL/Certbot
+certbot/
+nginx.conf.bak
+
+# Deployment backups
+backups/

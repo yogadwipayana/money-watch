@@ -38,6 +38,12 @@ docker-compose*.yml
 README.md
 *.md
 
+# SSL/Nginx
+certbot/
+nginx.conf
+init-letsencrypt.sh
+SSL-SETUP.md
+
 # Tests
 **/*.test.js
 **/*.spec.js
